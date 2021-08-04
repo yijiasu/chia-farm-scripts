@@ -1,0 +1,15 @@
+{
+  "name": "chia-farm-scripts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Yijia Su <crystalremnet@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "await-sleep": "^0.0.1",
+    "lodash": "^4.17.21",
+    "set-interval-async": "^2.0.3",
+    "shelljs": "^0.8.4",
+    "systeminformation": "^5.8.0",
+    "yargs": "^17.0.1"
+  }
+}
