@@ -7,9 +7,13 @@ const { setIntervalAsync } = require('set-interval-async/dynamic');
 const sleep = require('await-sleep');
 const { exec, execSync } = require('child_process');
 const si = require('systeminformation');
+const Koa = require('koa');
+const os = require('os');
 
 // const PLOT_SIZE = 108_100_000_000;
 const PLOT_SIZE = 108_100;
+const httpApp = new Koa();
+let lastUsedPort = 13000;
 
 function hasDir(watchDir) {
   const dirStat = fs.existsSync(watchDir) && fs.statSync(watchDir);
@@ -44,29 +48,59 @@ function getConfig() {
   return runConfig;
 }
 
-
-function runLoop({ port, destDir }) {
-  while (true) {
-    try {
-      const exitCode = execSync(`nc -p ${port} -l | tar -x`, { cwd: destDir });
-      logger.info(`Successfully exited. Re-run netcat`);
-    } catch (error) {
-      logger.info(`Last exitcode: ${error.status}`);
-    }
-  }
+function launchNetCat({ port, destDir }) {
+  return new Promise((resolve, reject) => {
+    const isMac = os.type() === 'Darwin';
+    const cmd = isMac ? `nc -l ${port} | tar -x` : `nc -p ${port} -l | tar -x`
+    const proc = exec(cmd, { cwd: destDir }, (error, stdout, stderr) => {
+      if (!error) {
+        logger.info(`Netcat Successfully exited`);
+        resolve();
+      } else {
+        console.error(error);
+        reject(new Error(`Netcat: Exited with error`));
+      }
+    });
+  });
 }
+function setupHttp(runConfig) {
+  httpApp.use(async ctx => {
 
-// async function getDiskInfo() {
-//   const blk = await si.blockDevices();
-//   console.log(blk);
-// }
+    if (ctx.method !== 'POST') {
+      ctx.body = 'GET Request not allowed';
+      ctx.status = 400;
+      return;
+    }
 
+    // Get Random Port
+    lastUsedPort++;
+    if (lastUsedPort >= 13100) {
+      lastUsedPort = 13000;
+    }
+
+    const ncPort = lastUsedPort;
+    logger.info(`Assign Port: ${ncPort}`);
+
+    launchNetCat({ port: ncPort, destDir: runConfig.destDir })
+      .then(() => {
+        logger.info(`Netcat exited successfully. Port: ${ncPort}`);
+      })
+      .catch(error => {
+        console.error(error);
+      });
+
+    ctx.body = {
+      port: ncPort,
+    };
+  });
+
+  httpApp.listen(runConfig.port);
+}
 function main() {
   const runConfig = getConfig();
   console.log(runConfig);
 
-  runLoop(runConfig);
-  // setIntervalAsync(runLoop, 2500, runConfig);
+  setupHttp(runConfig);
 }
 
 main();

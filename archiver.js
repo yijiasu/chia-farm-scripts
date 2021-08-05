@@ -108,6 +108,27 @@ async function archiveFile({ fileFullPath, destPath }) {
   });
 }
 
+async function selectDestPart({ farmDir, extraOpts }) {
+
+  let parts = await getAllPartsInfo(farmDir);
+  const spaces = await getAllFsInfo(farmDir);
+
+  parts = mergePartAndSpace(parts, spaces);
+
+  const fullParts = _(parts).filter(p => p.available < extraOpts.plotNeedSize).toArray().value();
+  const availableParts = _(parts).filter(p => p.available > extraOpts.plotNeedSize).sortBy(['available', 'label']).toArray().value();
+
+  logger.info(`TotalParts=${parts.length}; FullParts=${fullParts.length}; AvailableParts=${availableParts.length}`);
+  if (availableParts.length === 0 ) {
+    return;
+  }
+  logger.info(`First 5 Parts: \n${availableParts.slice(0, 5).map(p => `  -  ${p.mount} (${p.use})% `).join('\n')}`);
+
+  
+  return _.first(availableParts);
+
+}
+
 async function runLoop({ watchDir, farmDir, ...extraOpts }) {
   logger.info('Started Runloop...');
   if (!hasDir(watchDir)) {
@@ -122,56 +143,51 @@ async function runLoop({ watchDir, farmDir, ...extraOpts }) {
     return;
   }
 
-  let parts = await getAllPartsInfo(farmDir);
-  const spaces = await getAllFsInfo(farmDir);
+  for (const file of files) {
+    const fileFullPath = path.join(watchDir, file);
 
-  parts = mergePartAndSpace(parts, spaces);
-  // console.log(parts);
+    if (fileFullPath.endsWith('.plot')) {
+      const fileStat = fs.statSync(fileFullPath);
+      const fileSize = fileStat.size;
+      const lastModTime = fileStat.mtime;
 
-  const fullParts = _(parts).filter(p => p.available < extraOpts.plotNeedSize).toArray().value();
-  const availableParts = _(parts).filter(p => p.available > extraOpts.plotNeedSize).sortBy(['available', 'label']).toArray().value();
+      // Check if the plot is big enough
+      if (fileSize < extraOpts.plotSize) {
+        logger.info(
+          `Plot: ${file} is not ready. FileSize=${fileSize} Need=${extraOpts.plotSize}`
+        );
+        continue;
+      }
 
-  logger.info(`TotalParts=${parts.length}; FullParts=${fullParts.length}; AvailableParts=${availableParts.length}`);
-  if (availableParts.length === 0 ) {
-    logger.err('All parts are full! Skip this run');
-    return;
-  }
-  logger.info(`First 5 Parts: \n${availableParts.slice(0, 5).map(p => `  -  ${p.mount} (${p.use})% `).join('\n')}`);
+      // Check if has not been written for a while
+      const timeDiff = new Date() - new Date(lastModTime) / 1000;
 
-  const selectedPart = _.first(availableParts);
-  
+      if (timeDiff < 45) {
+        logger.info(
+          `Plot: ${file} is not ready. Wait for file unchanged state. LastChgSec=${timeDiff} Need=45`
+        );
+        continue;
+      }
 
-  const file = _.first(files);
-  const fileFullPath = path.join(watchDir, file);
+      // Check if we have a part to write
 
-  if (fileFullPath.endsWith('.plot')) {
+      const selectedPart = await selectDestPart({ farmDir, extraOpts })
 
-    const fileStat = fs.statSync(fileFullPath);
-    const fileSize = fileStat.size;
-    const lastModTime = fileStat.mtime;
+      if (!selectDestPart) {
+        logger.err('All parts are full! Skip this run');
+        return;
+      }
 
-    if (fileSize < extraOpts.plotSize) {
-      logger.info(`Plot: ${file} is not ready. FileSize=${fileSize} Need=${extraOpts.plotSize}`);
-      return;
+      logger.info(`Plot: ${file} is ready. Prepare to archive to ${selectDestPart.mount}`);
+
+      await archiveFile({
+        fileFullPath,
+        destPath: selectedPart.mount,
+      });
+
+      logger.info('Wait for 10 seconds');
+      await sleep(10000);
     }
-
-    // Check if has not been written for a while
-    const timeDiff = (new Date() - new Date(lastModTime) / 1000);
-    
-    if (timeDiff < 45) {
-      logger.info(`Plot: ${file} is not ready. Wait for file unchanged state. LastChgSec=${timeDiff} Need=45`);
-      return;
-    }
-
-    logger.info(`Plot: ${file} is ready. Prepare to archive`);
-
-    await archiveFile({
-      fileFullPath,
-      destPath: selectedPart.mount,
-    });
-
-    logger.info('Wait for 10 seconds');
-    await sleep(10000);
   }
 }
 
