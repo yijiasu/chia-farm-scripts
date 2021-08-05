@@ -173,12 +173,12 @@ async function runLoop({ watchDir, farmDir, ...extraOpts }) {
 
       const selectedPart = await selectDestPart({ farmDir, extraOpts })
 
-      if (!selectDestPart) {
+      if (!selectedPart) {
         logger.err('All parts are full! Skip this run');
         return;
       }
 
-      logger.info(`Plot: ${file} is ready. Prepare to archive to ${selectDestPart.mount}`);
+      logger.info(`Plot: ${file} is ready. Prepare to archive to ${selectedPart.mount}`);
 
       await archiveFile({
         fileFullPath,
