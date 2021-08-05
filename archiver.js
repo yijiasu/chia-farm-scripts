@@ -145,27 +145,33 @@ async function runLoop({ watchDir, farmDir, ...extraOpts }) {
   const fileFullPath = path.join(watchDir, file);
 
   if (fileFullPath.endsWith('.plot')) {
-    const fileSize = fs.statSync(fileFullPath).size;
-    // console.log(`${fileFullPath} => ${fileSize}`);
-    if (fileSize > extraOpts.plotSize) {
-      logger.info(`Plot: ${file} is ready. Prepare to archive`);
 
-      await archiveFile({
-        fileFullPath,
-        destPath: selectedPart.mount,
-      });
+    const fileStat = fs.statSync(fileFullPath);
+    const fileSize = fileStat.size;
+    const lastModTime = fileStat.mtime;
 
-      // archiveFileSync({
-      //   fileFullPath,
-      //   destPath: selectedPart.mount,
-      // });
-
-      logger.info('Wait for 10 seconds');
-      await sleep(10000);
-    }
-    else {
+    if (fileSize < extraOpts.plotSize) {
       logger.info(`Plot: ${file} is not ready. FileSize=${fileSize} Need=${extraOpts.plotSize}`);
+      return;
     }
+
+    // Check if has not been written for a while
+    const timeDiff = (new Date() - new Date(lastModTime) / 1000);
+    
+    if (timeDiff < 45) {
+      logger.info(`Plot: ${file} is not ready. Wait for file unchanged state. LastChgSec=${timeDiff} Need=45`);
+      return;
+    }
+
+    logger.info(`Plot: ${file} is ready. Prepare to archive`);
+
+    await archiveFile({
+      fileFullPath,
+      destPath: selectedPart.mount,
+    });
+
+    logger.info('Wait for 10 seconds');
+    await sleep(10000);
   }
 }
 
