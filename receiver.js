@@ -89,6 +89,10 @@ function setupHttp(runConfig) {
         console.error(error);
       });
 
+    // Wait 2 second to allow nc launch
+
+    await sleep(2000);
+
     ctx.body = {
       port: ncPort,
     };
