@@ -6,6 +6,7 @@ const { panic, logger } = require('./utils');
 const { setIntervalAsync } = require('set-interval-async/dynamic');
 const sleep = require('await-sleep');
 const { exec } = require('child_process');
+const fetch = require('node-fetch');
 
 const defaultConfig = {
   plotSize: 108_100_000_000,
@@ -73,6 +74,16 @@ async function uploadFile({ cwd, fileName, fileSize, remoteHost, remotePort }) {
   });
 }
 
+async function fetchNetCatPort({ remoteHost, remotePort }) {
+  const resp = await fetch(`http://${remoteHost}:${remotePort}`, {
+    method: 'POST',
+  }).then(res => res.json());
+  if (!resp.port) {
+    throw new Error(`Port not defined in response`);
+  }
+  return resp.port;
+}
+
 async function runLoop({ watchDir, keepFile, plotSize, ...extraOpts }) {
   logger.info('Started Runloop...');
   if (!hasDir(watchDir)) {
@@ -90,12 +101,16 @@ async function runLoop({ watchDir, keepFile, plotSize, ...extraOpts }) {
       if (fileSize > plotSize) {
         logger.info(`Plot: ${file} is ready. Prepare to upload`);
         try {
+          const portToUpload = await fetchNetCatPort({ ...extraOpts });
+          logger.info(`Upload to: ${extraOpts.remoteHost}:${portToUpload}`);
           await uploadFile({
+            ...extraOpts,
             cwd: watchDir,
             fileSize,
             fileName: file,
-            ...extraOpts,
+            remotePort: portToUpload
           });
+
           logger.info('Wait for 10 seconds');
           await sleep(10000);
           if (!keepFile) {
