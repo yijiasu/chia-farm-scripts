@@ -9,15 +9,19 @@ const getFormattedDate = () => {
   return str;
 }
 
-const logger = {
-  warn: msg => console.error(`[${getFormattedDate()}] WARN: ${msg}`),
-  err: msg => console.error(`[${getFormattedDate()}] ERR: ${msg}`),
-  info: msg => console.log(`[${getFormattedDate()}] INFO: ${msg}`),
-};
+function loggerFactory (loggerName) {
+  const logger = {
+    warn: msg => console.error(`[${getFormattedDate()}] ${loggerName} [WARN] ${msg}`),
+    err: msg => console.error(`[${getFormattedDate()}] ${loggerName} [ERR] ${msg}`),
+    info: msg => console.log(`[${getFormattedDate()}] ${loggerName} [INFO] ${msg}`),
+  };
+  
+  return logger;
+}
 
 function panic(errMsg) {
   logger.err(errMsg);
   process.exit(-1);
 }
 
-module.exports = { panic, logger };
+module.exports = { panic, loggerFactory };

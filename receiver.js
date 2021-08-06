@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-const { panic, logger } = require('./utils');
+const { panic, loggerFactory } = require('./utils');
 const { setIntervalAsync } = require('set-interval-async/dynamic');
 const sleep = require('await-sleep');
 const { exec, execSync } = require('child_process');
@@ -14,6 +14,8 @@ const os = require('os');
 const PLOT_SIZE = 108_100;
 const httpApp = new Koa();
 let lastUsedPort = 13000;
+
+const logger = loggerFactory('RECV');
 
 function hasDir(watchDir) {
   const dirStat = fs.existsSync(watchDir) && fs.statSync(watchDir);
@@ -99,6 +101,7 @@ function setupHttp(runConfig) {
   });
 
   httpApp.listen(runConfig.port);
+  logger.info(`Receiver Started. Listen HTTP Port: ${runConfig.port}`);
 }
 function main() {
   const runConfig = getConfig();

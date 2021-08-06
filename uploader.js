@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-const { panic, logger } = require('./utils');
+const { panic, loggerFactory } = require('./utils');
 const { setIntervalAsync } = require('set-interval-async/dynamic');
 const sleep = require('await-sleep');
 const { exec } = require('child_process');
@@ -12,6 +12,8 @@ const defaultConfig = {
   plotSize: 108_100_000_000,
   runLoopInterval: 15000,
 };
+
+const logger = loggerFactory('UPLOADER');
 
 function hasDir(watchDir) {
   const dirStat = fs.existsSync(watchDir) && fs.statSync(watchDir);
