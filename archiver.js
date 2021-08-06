@@ -178,13 +178,18 @@ async function runLoop({ watchDir, farmDir, ...extraOpts }) {
 
       logger.info(`Plot: ${file} is ready. Prepare to archive to ${selectedPart.mount}`);
 
-      await archiveFile({
-        fileFullPath,
-        destPath: selectedPart.mount,
-      });
+      try {
+        await archiveFile({
+          fileFullPath,
+          destPath: selectedPart.mount,
+        });
+  
+        logger.info('Wait for 10 seconds');
+        await sleep(10000);  
 
-      logger.info('Wait for 10 seconds');
-      await sleep(10000);
+      } catch (error) {
+        console.error(error);
+      }
     }
   }
 }
