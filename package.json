@@ -16,5 +16,10 @@
   },
   "devDependencies": {
     "@types/node-fetch": "^2.5.12"
+  },
+  "scripts": {
+    "archiver": "node ./services/archiver/archiver.js",
+    "receiver": "node ./services/receiver/receiver.js",
+    "uploader": "node ./services/uploader/uploader.js"
   }
 }
