@@ -148,53 +148,53 @@ async function runLoop({ watchDir, farmDir, ...extraOpts }) {
 
   for (const file of files) {
     const fileFullPath = path.join(watchDir, file);
+    try {
+      if (fileFullPath.endsWith('.plot')) {
+        const fileStat = fs.statSync(fileFullPath);
+        const fileSize = fileStat.size;
+        const lastModTime = fileStat.mtime;
 
-    if (fileFullPath.endsWith('.plot')) {
-      const fileStat = fs.statSync(fileFullPath);
-      const fileSize = fileStat.size;
-      const lastModTime = fileStat.mtime;
+        // Check if the plot is big enough
+        if (fileSize < extraOpts.plotSize) {
+          logger.info(
+            `Plot: ${file} is not ready. FileSize=${fileSize} Need=${extraOpts.plotSize}`
+          );
+          continue;
+        }
 
-      // Check if the plot is big enough
-      if (fileSize < extraOpts.plotSize) {
+        // Check if has not been written for a while
+        const timeDiff = new Date() - new Date(lastModTime) / 1000;
+
+        if (timeDiff < 45) {
+          logger.info(
+            `Plot: ${file} is not ready. Wait for file unchanged state. LastChgSec=${timeDiff} Need=45`
+          );
+          continue;
+        }
+
+        // Check if we have a part to write
+
+        const selectedPart = await selectDestPart({ farmDir, extraOpts });
+
+        if (!selectedPart) {
+          logger.err('All parts are full! Skip this run');
+          return;
+        }
+
         logger.info(
-          `Plot: ${file} is not ready. FileSize=${fileSize} Need=${extraOpts.plotSize}`
+          `Plot: ${file} is ready. Prepare to archive to ${selectedPart.mount}`
         );
-        continue;
-      }
 
-      // Check if has not been written for a while
-      const timeDiff = new Date() - new Date(lastModTime) / 1000;
-
-      if (timeDiff < 45) {
-        logger.info(
-          `Plot: ${file} is not ready. Wait for file unchanged state. LastChgSec=${timeDiff} Need=45`
-        );
-        continue;
-      }
-
-      // Check if we have a part to write
-
-      const selectedPart = await selectDestPart({ farmDir, extraOpts })
-
-      if (!selectedPart) {
-        logger.err('All parts are full! Skip this run');
-        return;
-      }
-
-      logger.info(`Plot: ${file} is ready. Prepare to archive to ${selectedPart.mount}`);
-
-      try {
         await archiveFile({
           fileFullPath,
           destPath: selectedPart.mount,
         });
-  
-        logger.info('Wait for 10 seconds');
-        await sleep(10000);  
 
-      } catch (error) {
-        console.error(error);
+        logger.info('Wait for 10 seconds');
+        await sleep(10000);
       }
+    } catch (error) {
+      console.error(error);
     }
   }
 }
