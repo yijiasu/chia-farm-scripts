@@ -207,13 +207,15 @@ async function main() {
 
     if (runConfig.printDiskInfo) {
 
+      const farmDir = runConfig.farmDir
+
       let parts = await getAllPartsInfo(farmDir);
       const spaces = await getAllFsInfo(farmDir);
     
       parts = mergePartAndSpace(parts, spaces);
     
-      const fullParts = _(parts).filter(p => p.available < extraOpts.plotNeedSize).toArray().value();
-      const availableParts = _(parts).filter(p => p.available > extraOpts.plotNeedSize).sortBy(['available', 'label']).toArray().value();
+      const fullParts = _(parts).filter(p => p.available < runConfig.plotNeedSize).toArray().value();
+      const availableParts = _(parts).filter(p => p.available > runConfig.plotNeedSize).sortBy(['available', 'label']).toArray().value();
 
       console.log('====Full Parts===');
       console.log(fullParts);
