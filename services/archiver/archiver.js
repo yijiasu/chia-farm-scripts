@@ -206,8 +206,21 @@ async function main() {
   if (runConfig.dryRun) {
 
     if (runConfig.printDiskInfo) {
-      const diskInfo = await getAllPartsInfo(runConfig.farmDir);
-      console.log(diskInfo);
+
+      let parts = await getAllPartsInfo(farmDir);
+      const spaces = await getAllFsInfo(farmDir);
+    
+      parts = mergePartAndSpace(parts, spaces);
+    
+      const fullParts = _(parts).filter(p => p.available < extraOpts.plotNeedSize).toArray().value();
+      const availableParts = _(parts).filter(p => p.available > extraOpts.plotNeedSize).sortBy(['available', 'label']).toArray().value();
+
+      console.log('====Full Parts===');
+      console.log(fullParts);
+
+      console.log('====Available Parts===');
+      console.log(availableParts);
+
     }
 
     process.exit(0);
