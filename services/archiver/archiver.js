@@ -215,7 +215,12 @@ async function main() {
       parts = mergePartAndSpace(parts, spaces);
     
       const fullParts = _(parts).filter(p => p.available < runConfig.plotNeedSize).toArray().value();
-      const availableParts = _(parts).filter(p => p.available > runConfig.plotNeedSize).sortBy(['use', 'label']).toArray().value();
+      const availableParts = _(parts)
+        .filter(p => p.available > runConfig.plotNeedSize)
+        .sortBy(['use', 'label'])
+        .reverse()
+        .toArray()
+        .value();
 
       console.log('====Full Parts===');
       console.log(fullParts);
