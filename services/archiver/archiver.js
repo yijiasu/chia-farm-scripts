@@ -206,7 +206,7 @@ async function main() {
   if (runConfig.dryRun) {
 
     if (runConfig.printDiskInfo) {
-      const diskInfo = await getAllPartsInfo();
+      const diskInfo = await getAllPartsInfo(runConfig.farmDir);
       console.log(diskInfo);
     }
 
