@@ -28,6 +28,7 @@ function getConfig() {
     .alias('h', 'help')
     .describe('watchdir', 'set which dir to watch')
     .describe('farmdir', 'set dest farm dir')
+    .describe('print-disk-info', 'only print disk info and exit')
     .argv;
 
   const runConfig = {};
@@ -50,7 +51,11 @@ function getConfig() {
 
   runConfig.watchDir = argv.watchdir;
   runConfig.farmDir = argv.farmdir;
-
+  
+  if (argv['print-disk-info']) {
+    runConfig.dryRun = true;
+    runConfig.printDiskInfo = true;
+  }
   return { ...defaultConfig, ...runConfig };
 }
 
@@ -198,7 +203,18 @@ async function main() {
   const runConfig = getConfig();
   console.log(runConfig);
 
+  if (runConfig.dryRun) {
+
+    if (runConfig.printDiskInfo) {
+      const diskInfo = await getAllPartsInfo();
+      console.log(diskInfo);
+    }
+
+    process.exit(0);
+  }
+
   setIntervalAsync(runLoop, runConfig.runLoopInterval, runConfig);
+
 }
 
 main();
