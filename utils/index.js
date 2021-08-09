@@ -20,6 +20,7 @@ function loggerFactory (loggerName) {
 }
 
 function panic(errMsg) {
+  const logger = loggerFactory();
   logger.err(errMsg);
   process.exit(-1);
 }
