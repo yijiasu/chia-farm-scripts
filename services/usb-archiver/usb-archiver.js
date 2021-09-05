@@ -61,6 +61,14 @@ function getConfig() {
     runConfig.dryRun = true;
     runConfig.printUsbInfo = true;
   }
+  else if (argv['print-udev-info']) {
+    runConfig.dryRun = true;
+    runConfig.printUdevInfo = true;
+  }
+  else if (argv['print-disk-usb-assign']) {
+    runConfig.dryRun = true;
+    runConfig.printDiskUsbAssign = true;
+  }
 
   return { ...defaultConfig, ...runConfig };
 }
@@ -82,6 +90,45 @@ async function getAllFsInfo(farmDir) {
   const fsInfo = await si.fsSize();
   const validFsInfo = fsInfo.filter(e => e.mount.startsWith(farmDir));
   return validFsInfo;
+}
+
+async function getUdevInfo() {
+
+  const usbInfo = await si.usb();
+  const usbHubInfo = _.filter(usbInfo, u => u.deviceId === 1);
+
+  const udevList = _.filter(udev.list(), dev => {
+    const isUSB = dev['DEVPATH'].indexOf('usb') !== -1;
+    const isDiskType = dev['ID_TYPE'] === 'disk';
+    const isPartition = dev['DEVTYPE'] === 'partition';
+    const isExt4 = dev['ID_FS_TYPE'] === 'ext4';
+    return isUSB && isDiskType && isPartition && isExt4;
+  }).map(dev => {
+    const devPath = dev['DEVPATH'];
+    const devPathChunks = devPath.split('/');
+    const usbBusId = devPathChunks[5];
+    return { ...dev, USB_BUS: usbBusId };
+  }).map(dev => {
+    const toFindHub = _.find(usbHubInfo, { bus: Number(dev['USB_BUS'].replace('usb', '')) });
+    return { ...dev, IS_USB3: toFindHub ? toFindHub.name.includes('3.0') : false };
+  })
+
+  return udevList;
+
+}
+
+async function getDiskUsbAssign(farmDir) {
+  let partsInfo = await getAllPartsInfo(farmDir);
+  const allUdevInfo = await getUdevInfo();
+  partsInfo = partsInfo.map(pi => {
+    const udevInfo = _.find(allUdevInfo, { ID_FS_LABEL: pi.label });
+    return {
+      ...pi,
+      isUsb3: udevInfo['IS_USB3'],
+      usbBus: udevInfo['USB_BUS'],
+    };
+  });
+  return partsInfo;
 }
 
 function mergePartAndSpace(parts, spaces) {
@@ -248,6 +295,36 @@ async function main() {
       process.exit(0);
 
     }
+    else if (runConfig.printUdevInfo) {
+
+      console.log('Print Udev Info')
+      const udevInfo = await getUdevInfo();
+      console.log(udevInfo);
+      process.exit(0);
+
+    }
+    else if (runConfig.printDiskUsbAssign) {
+
+      const assignInfo = await getDiskUsbAssign(runConfig.farmDir);
+      const groupedInfo = _.groupBy(assignInfo, 'usbBus');
+
+      for (const [usbBus, parts] of Object.entries(groupedInfo)) {
+        console.log(`USB Host ${usbBus}  Devices=${parts.length}`);
+        for (const part of parts) {
+          console.log(`\t`.concat([
+            part.isUsb3 ? '[*USB3]' : '[USB2]',
+            part.mount,
+            '\t',
+            `${Math.round(part.size / (1024 ** 3))} GiB`,
+            '\t',
+            `/dev/${part.name}`
+          ].join(' ')))
+        }
+      }
+      process.exit(0);
+
+    }
+
 
   }
 

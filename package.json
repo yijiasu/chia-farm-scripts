@@ -12,6 +12,7 @@
     "set-interval-async": "^2.0.3",
     "shelljs": "^0.8.4",
     "systeminformation": "^5.8.0",
+    "udev": "^1.0.0",
     "yargs": "^17.0.1"
   },
   "devDependencies": {
@@ -19,7 +20,7 @@
     "nodemon": "^2.0.12"
   },
   "scripts": {
-    "vm-watch-push": "nodemon --watch . --exec ./push_to_vm.sh",
+    "vm-watch-push": "nodemon --watch . --exec ./push_to_collector_test.sh",
     "usb-archiver": "node ./services/usb-archiver/usb-archiver.js",
     "archiver": "node ./services/archiver/archiver.js",
     "receiver": "node ./services/receiver/receiver.js",
