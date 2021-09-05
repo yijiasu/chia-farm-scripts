@@ -15,9 +15,12 @@
     "yargs": "^17.0.1"
   },
   "devDependencies": {
-    "@types/node-fetch": "^2.5.12"
+    "@types/node-fetch": "^2.5.12",
+    "nodemon": "^2.0.12"
   },
   "scripts": {
+    "vm-watch-push": "nodemon --watch . --exec ./push_to_vm.sh",
+    "usb-archiver": "node ./services/usb-archiver/usb-archiver.js",
     "archiver": "node ./services/archiver/archiver.js",
     "receiver": "node ./services/receiver/receiver.js",
     "uploader": "node ./services/uploader/uploader.js"
