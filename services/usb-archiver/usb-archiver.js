@@ -5,15 +5,16 @@ const { hideBin } = require('yargs/helpers');
 const { panic, loggerFactory } = require('../../utils');
 const { setIntervalAsync } = require('set-interval-async/dynamic');
 const sleep = require('await-sleep');
-const { exec, execSync } = require('child_process');
 const si = require('systeminformation');
 const _ = require('lodash');
-const udev = require("udev");
+const { mergePartAndSpace, getAllPartsInfo, getAllFsInfo, getUdevInfo, getDiskUsbAssign } = require('./misc');
+const { CopyTaskManager } = require('./copy-task');
 
 const defaultConfig = {
   plotSize: 108_100_000_000,
   plotNeedSize: 109_100_000_000,
-  runLoopInterval: 30000,
+  runLoopInterval: 3000,
+  concurrentJobs: 3
 };
 
 const logger = loggerFactory('ARCHIVER');
@@ -22,6 +23,7 @@ function hasDir(watchDir) {
   const dirStat = fs.existsSync(watchDir) && fs.statSync(watchDir);
   return dirStat.isDirectory;
 }
+
 function getConfig() {
   const argv = yargs(hideBin(process.argv))
     .usage('Usage: $0 [options]')
@@ -73,100 +75,6 @@ function getConfig() {
   return { ...defaultConfig, ...runConfig };
 }
 
-async function getAllPartsInfo(farmDir, addUsbInfo = false) {
-  const diskInfo = await si.blockDevices();
-  const validParts = _.filter(diskInfo, {
-    type: 'part',
-    fsType: 'ext4',
-  }).filter(p => p.mount.startsWith(farmDir));
-
-  if (addUsbInfo) {
-
-  }
-  return validParts;
-}
-
-async function getAllFsInfo(farmDir) {
-  const fsInfo = await si.fsSize();
-  const validFsInfo = fsInfo.filter(e => e.mount.startsWith(farmDir));
-  return validFsInfo;
-}
-
-async function getUdevInfo() {
-
-  const usbInfo = await si.usb();
-  const usbHubInfo = _.filter(usbInfo, u => u.deviceId === 1);
-
-  const udevList = _.filter(udev.list(), dev => {
-    const isUSB = dev['DEVPATH'].indexOf('usb') !== -1;
-    const isDiskType = dev['ID_TYPE'] === 'disk';
-    const isPartition = dev['DEVTYPE'] === 'partition';
-    const isExt4 = dev['ID_FS_TYPE'] === 'ext4';
-    return isUSB && isDiskType && isPartition && isExt4;
-  }).map(dev => {
-    const devPath = dev['DEVPATH'];
-    const devPathChunks = devPath.split('/');
-    const usbBusId = devPathChunks[5];
-    return { ...dev, USB_BUS: usbBusId };
-  }).map(dev => {
-    const toFindHub = _.find(usbHubInfo, { bus: Number(dev['USB_BUS'].replace('usb', '')) });
-    return { ...dev, IS_USB3: toFindHub ? toFindHub.name.includes('3.0') : false };
-  })
-
-  return udevList;
-
-}
-
-async function getDiskUsbAssign(farmDir) {
-  let partsInfo = await getAllPartsInfo(farmDir);
-  const allUdevInfo = await getUdevInfo();
-  partsInfo = partsInfo.map(pi => {
-    const udevInfo = _.find(allUdevInfo, { ID_FS_LABEL: pi.label });
-    return {
-      ...pi,
-      isUsb3: udevInfo['IS_USB3'],
-      usbBus: udevInfo['USB_BUS'],
-    };
-  });
-  return partsInfo;
-}
-
-function mergePartAndSpace(parts, spaces) {
-  return _.map(parts, part => {
-    const fsInfo = _.find(spaces, { mount: part.mount });
-    return {...part, ...fsInfo};
-  });
-}
-
-function archiveFileSync({ fileFullPath, destPath }) {
-  try {
-    execSync(`rsync -aP --remove-source-files ${fileFullPath} ${destPath}`, { stdio: 'inherit' });
-    logger.info(`Successfully archive`);
-  } catch (error) {
-    console.error(error);
-    logger.info(`Last exitcode: ${error.status}`);
-  }
-
-}
-
-async function archiveFile({ fileFullPath, destPath }) {
-  return new Promise((resolve, reject) => {
-
-    const cmd = `rsync -aP --remove-source-files ${fileFullPath} ${destPath}`;
-    const proc = exec(cmd, (error, stdout, stderr) => {
-      if (!error) {
-        logger.info(`Successful archived: ${fileFullPath}`);
-        resolve();
-      } else {
-        console.error(error);
-        reject(new Error(`Upload: ${fileFullPath} exited with error`));
-      }
-    });
-
-    proc.stdout.pipe(process.stdout);
-    proc.stderr.pipe(process.stderr);
-  });
-}
 
 async function selectDestPart({ farmDir, extraOpts }) {
 
@@ -189,19 +97,18 @@ async function selectDestPart({ farmDir, extraOpts }) {
 
 }
 
-async function runLoop({ watchDir, farmDir, ...extraOpts }) {
+async function runLoop({ watchDir, farmDir, copyTaskManager, ...extraOpts }) {
   logger.info('Started Runloop...');
   if (!hasDir(watchDir)) {
     logger.warn('watchdir is not valid... skip this run');
     return;
   }
 
-  const files = fs.readdirSync(watchDir);
 
-  if (files.length === 0) {
-    logger.info('watchdir is empty... skip this run');
-    return;
-  }
+  // const progressReport = copyTaskManager.getReport();
+  // console.log(progressReport);
+
+  const files = fs.readdirSync(watchDir);  
 
   for (const file of files) {
     const fileFullPath = path.join(watchDir, file);
@@ -231,21 +138,25 @@ async function runLoop({ watchDir, farmDir, ...extraOpts }) {
 
         // Check if we have a part to write
 
-        const selectedPart = await selectDestPart({ farmDir, extraOpts });
-
-        if (!selectedPart) {
-          logger.err('All parts are full! Skip this run');
-          return;
+        if (await copyTaskManager.canHandleFile(fileFullPath)) {
+          copyTaskManager.startTask(fileFullPath);
         }
 
-        logger.info(
-          `Plot: ${file} is ready. Prepare to archive to ${selectedPart.mount}`
-        );
+        // const selectedPart = await selectDestPart({ farmDir, extraOpts });
 
-        await archiveFile({
-          fileFullPath,
-          destPath: selectedPart.mount,
-        });
+        // if (!selectedPart) {
+        //   logger.err('All parts are full! Skip this run');
+        //   return;
+        // }
+
+        // logger.info(
+        //   `Plot: ${file} is ready. Prepare to archive to ${selectedPart.mount}`
+        // );
+
+        // await archiveFile({
+        //   fileFullPath,
+        //   destPath: selectedPart.mount,
+        // });
 
         logger.info('Wait for 10 seconds');
         await sleep(10000);
@@ -259,6 +170,8 @@ async function runLoop({ watchDir, farmDir, ...extraOpts }) {
 async function main() {
   const runConfig = getConfig();
   console.log(runConfig);
+
+  const copyTaskManager = new CopyTaskManager(runConfig);
 
   if (runConfig.dryRun) {
 
@@ -305,7 +218,9 @@ async function main() {
     }
     else if (runConfig.printDiskUsbAssign) {
 
-      const assignInfo = await getDiskUsbAssign(runConfig.farmDir);
+      const spaces = await getAllFsInfo(runConfig.farmDir);
+      let assignInfo = await getDiskUsbAssign(runConfig.farmDir);
+      assignInfo = mergePartAndSpace(assignInfo, spaces);
       const groupedInfo = _.groupBy(assignInfo, 'usbBus');
 
       for (const [usbBus, parts] of Object.entries(groupedInfo)) {
@@ -316,8 +231,8 @@ async function main() {
             part.mount,
             '\t',
             `${Math.round(part.size / (1024 ** 3))} GiB`,
-            '\t',
-            `/dev/${part.name}`
+            '\t', `${Math.round(part.use)}%`,
+            '\t', `/dev/${part.name}`
           ].join(' ')))
         }
       }
@@ -328,7 +243,7 @@ async function main() {
 
   }
 
-  setIntervalAsync(runLoop, runConfig.runLoopInterval, runConfig);
+  setIntervalAsync(runLoop, runConfig.runLoopInterval, { copyTaskManager, ...runConfig });
 
 }
 
