@@ -81,7 +81,7 @@ class CopyTaskManager {
 
   async checkAvailable() {
     const writeDestTuple = await this.getWriteDest();
-    if (!writeDest) {
+    if (!writeDestTuple) {
       return false;
     }
     const { usbBus, writeDest } = writeDestTuple;
