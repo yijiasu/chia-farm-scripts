@@ -67,6 +67,7 @@ class CopyTaskManager {
               break;
             } catch (error) {
               logger.warn(`${writeDest} is not writable. Skip`);
+              writeDest = undefined;
             }
           }
         }
