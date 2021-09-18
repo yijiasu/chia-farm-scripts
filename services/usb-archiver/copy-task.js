@@ -56,7 +56,6 @@ class CopyTaskManager {
       }
       else {
         logger.info(`First 5 Parts: \n${availableParts.slice(0, 5).map(p => `  -  ${p.mount} (${p.use})% `).join('\n')}`);
-        let writeDest;
         while (availableParts.length !== 0 && writeDest === undefined) {
           writeDest = availableParts.shift();
           if (writeDest) {
