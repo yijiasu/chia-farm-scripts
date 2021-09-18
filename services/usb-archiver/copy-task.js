@@ -64,6 +64,7 @@ class CopyTaskManager {
             // check writeable
             try {
               accessSync(writeDest, constants.W_OK);
+              logger.info(`${writeDest} is okay to write`);
               break;
             } catch (error) {
               logger.warn(`${writeDest} is not writable. Skip`);
