@@ -59,12 +59,15 @@ class CopyTaskManager {
         let writeDest;
         while (availableParts.length !== 0 && writeDest === undefined) {
           writeDest = availableParts.shift();
-          // check writeable
-          try {
-            accessSync(writeDest, constants.W_OK);
-            break;
-          } catch (error) {
-            logger.warn(`${writeDest} is not writable. Skip`);
+          if (writeDest) {
+            writeDest = writeDest.mount;
+            // check writeable
+            try {
+              accessSync(writeDest, constants.W_OK);
+              break;
+            } catch (error) {
+              logger.warn(`${writeDest} is not writable. Skip`);
+            }
           }
         }
         usbBus = host
