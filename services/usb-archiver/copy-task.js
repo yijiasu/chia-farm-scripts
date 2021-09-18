@@ -2,7 +2,7 @@ const { panic, loggerFactory } = require('../../utils');
 const _ = require('lodash');
 const { mergePartAndSpace, getAllPartsInfo, getAllFsInfo, getUdevInfo, getDiskUsbAssign } = require('./misc');
 const { exec } = require('child_process');
-
+const { accessSync, constants } = require('fs');
 const logger = loggerFactory('ARCHIVER_CTM');
 
 class CopyTaskManager {
@@ -56,7 +56,17 @@ class CopyTaskManager {
       }
       else {
         logger.info(`First 5 Parts: \n${availableParts.slice(0, 5).map(p => `  -  ${p.mount} (${p.use})% `).join('\n')}`);
-        writeDest = _.first(availableParts).mount;
+        let writeDest;
+        while (availableParts.length !== 0 && writeDest === undefined) {
+          writeDest = availableParts.shift();
+          // check writeable
+          try {
+            accessSync(writeDest, constants.W_OK);
+            break;
+          } catch (error) {
+            logger.warn(`${writeDest} is not writable. Skip`);
+          }
+        }
         usbBus = host
         break;
       }
