@@ -12,8 +12,10 @@
     "set-interval-async": "^2.0.3",
     "shelljs": "^0.8.4",
     "systeminformation": "^5.8.0",
-    "udev": "^1.0.0",
     "yargs": "^17.0.1"
+  },
+  "optionalDependencies": {
+    "udev": "^1.0.0"
   },
   "devDependencies": {
     "@types/node-fetch": "^2.5.12",
@@ -24,6 +26,7 @@
     "usb-archiver": "node ./services/usb-archiver/usb-archiver.js",
     "archiver": "node ./services/archiver/archiver.js",
     "receiver": "node ./services/receiver/receiver.js",
-    "uploader": "node ./services/uploader/uploader.js"
+    "uploader": "node ./services/uploader/uploader.js",
+    "mount": "node ./services/mount/mount.js"
   }
 }
