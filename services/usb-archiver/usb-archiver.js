@@ -32,6 +32,9 @@ function getConfig() {
     .describe('watchdir', 'set which dir to watch')
     .describe('farmdir', 'set dest farm dir')
     .describe('print-disk-info', 'only print disk info and exit')
+    .describe('print-usb-info', 'only print usb info and exit')
+    .describe('print-udev-info', 'only print udev info and exit')
+    .describe('print-disk-usb-assign', 'only print disk/usb assign and exit')
     .argv;
 
   const runConfig = {};
@@ -223,7 +226,7 @@ async function main() {
       assignInfo = mergePartAndSpace(assignInfo, spaces);
       const groupedInfo = _.groupBy(assignInfo, 'usbBus');
 
-      for (const [usbBus, parts] of Object.entries(groupedInfo)) {
+      for (const [usbBus, parts] of _.sortBy(Object.entries(groupedInfo), e => Number(e[0].replace('usb', '')))) {
         console.log(`USB Host ${usbBus}  Devices=${parts.length}`);
         for (const part of parts) {
           console.log(`\t`.concat([

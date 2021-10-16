@@ -35,8 +35,7 @@ async function getUdevInfo() {
     return isUSB && isDiskType && isPartition && isExt4;
   }).map(dev => {
     const devPath = dev['DEVPATH'];
-    const devPathChunks = devPath.split('/');
-    const usbBusId = devPathChunks[5];
+    const usbBusId = devPath.match(/\/usb\d+\//)[0].replace(/\//g, '');
     return { ...dev, USB_BUS: usbBusId };
   }).map(dev => {
     const toFindHub = _.find(usbHubInfo, { bus: Number(dev['USB_BUS'].replace('usb', '')) });
